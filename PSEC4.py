@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import bokeh.plotting as bkh
 import os
 import datetime
 import subprocess
@@ -44,16 +45,32 @@ with open(oname+'.txt', 'r') as f:
 			channels = [[],[],[],[],[],[],[]]
 print 'Read out %d samples, in %d lines' % (len(samples), j)
 
-fig, ax = plt.subplots()
+#recover the user inputted name so it can be applied to graphs and whatever
+stamp = oname.split('/')[-1].strip('.txt')
 
-fig.canvas.set_window_title(oname.split('/')[-1])
-ax.set_xlabel('data index')
-ax.set_ylabel('Readout Voltage')
+# output graph to a static HTML file
+bkh.output_file(stamp+'.html')
 
-i = 0
-col = ['black', 'red']
+#create plot object
+p = bkh.figure(plot_width=1000, title=stamp, x_axis_label='N', y_axis_label='Voltage, V')
+
+# Read the channels from each sample into long lists for plotting
+channels = [[],[],[],[],[],[]]
 for sample in samples:
-	plt.plot(sample[0], sample[1], color=col[i%2])
+	for i in range(6):
+		for data in sample[i]:
+			channels[i].append(data)
+j = range(len(channels[0]))
+
+# Plot the data
+col = ['red', 'blue', 'orange', 'green', 'purple', 'black']
+i = 1
+#add data to the plot object
+for channel in channels:
+	p.line(j, channel, legend='Channel '+str(i), line_width=1, line_color=col[i-1])
 	i += 1
 
-plt.show()
+# set ranges
+p.y_range = Range1d(1.1*vmin, 1.1*vmax)
+
+bkh.save(p)
