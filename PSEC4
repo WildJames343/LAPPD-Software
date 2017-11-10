@@ -6,7 +6,7 @@ import datetime
 import subprocess
 
 ### FILEPATH TO PSEC4 CODE DIRECTORY!!! SET THIS!!!!!! ###
-DIR = '/home/wizenedchimp/Documents/LAPPD-Project/run-psec4-master'
+# DIR = ''
 
 def find(name, path):
     result = ''
