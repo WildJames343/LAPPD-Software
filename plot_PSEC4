@@ -43,7 +43,7 @@ print 'Read out %d samples, in %d lines' % (len(samples), j)
 stamp = oname.split('/')[-1].strip('.txt')
 
 # output graph to a static HTML file
-bkh.output_file(stamp+'.html')
+bkh.output_file(stamp.replace('DATA', 'FIGS')+'.html')
 
 #create plot object
 p = bkh.figure(plot_width=1000, title=stamp, x_axis_label='N', y_axis_label='Voltage, V')

@@ -8,12 +8,36 @@ import subprocess
 ### FILEPATH TO PSEC4 CODE DIRECTORY!!! SET THIS!!!!!! ###
 DIR = '/home/wizenedchimp/Documents/LAPPD-Project/run-psec4-master'
 
+def find(name, path):
+    result = ''
+    for root, dirs, files in os.walk(path):
+        if name in files:
+            result = os.path.join(root, name)
+            break
+    return result
+
+try:
+	DIR
+except:
+	print 'PSEC directory not set! Attempting to search for it...'
+	DIR = find('TakePed', '/home')[:-12]
+	print DIR
+
+os.chdir(DIR)
 
 oname = raw_input('Please enter a filename (blank for automatic):')
 if oname == '':
 	t = datetime.datetime.now()
 	oname = 'sample_'+str(t.year)+'-'+str(t.month)+'-'+str(t.day)+'_'+str(t.hour)+'h'+str(t.minute)+'m'
-oname = DIR+'/DATA/'+oname
+
+# Check if the DATA and FIGS paths exist, and if not create them.
+if not os.path.exists('/DATA/'):
+	print 'DATA directory not found. Creating a folder...'
+	os.makedirs('./DATA/')
+if not os.path.exists('/FIGS/'):
+	print 'FIGS directory not found. Creating a folder...'
+	os.makedirs('./FIGS/')
+
 
 print 'Writing to %s.txt' % oname
 N = ''
@@ -23,13 +47,14 @@ while type(N) != int:
 	try:
 		N = int(N)
 	except:
-		print "That's not a number!\n"
+		print "That's not a number!"
 		i += 1
-		if i >= 3:
-			print 'Why are you like this'
+		if i > 2:
+			print '...Why are you like this'
+		print '\n'
 
 
-command = [DIR+'/bin/LogData', str(oname), str(N), '0']
+command = ['/bin/LogData', './DATA/'+str(oname), str(N), '0']
 psec = subprocess.Popen(command)
 psec.wait()
 
@@ -57,14 +82,11 @@ with open(oname+'.txt', 'r') as f:
 			channels = [[],[],[],[],[],[],[]]
 print 'Read out %d samples, in %d lines' % (len(samples), j)
 
-#recover the user inputted name so it can be applied to graphs and whatever
-stamp = oname.split('/')[-1].strip('.txt')
-
 # output graph to a static HTML file
-bkh.output_file(stamp+'.html')
+bkh.output_file(oname+'.html')
 
 #create plot object
-p = bkh.figure(plot_width=1000, title=stamp, x_axis_label='N', y_axis_label='Voltage, V')
+p = bkh.figure(plot_width=1000, title=oname, x_axis_label='N', y_axis_label='Voltage, V')
 
 # Read the channels from each sample into long lists for plotting
 channels = [[],[],[],[],[],[]]
