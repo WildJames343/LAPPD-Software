@@ -6,7 +6,7 @@ import datetime
 import subprocess
 
 ### FILEPATH TO PSEC4 CODE DIRECTORY!!! SET THIS!!!!!! ###
-# DIR = ''
+# DIR = '/home/wizenedchimp/Documents/LAPPD-Project/run-psec4-master'
 
 def find(name, path):
     result = ''
@@ -53,22 +53,24 @@ while type(N) != int:
 			print '...Why are you like this'
 		print '\n'
 
-
+# Ask the PSEC to read the thing, and store it in DATA with the name we want
 command = ['/bin/LogData', './DATA/'+str(oname), str(N), '0']
 psec = subprocess.Popen(command)
 psec.wait()
 
+# If we can't find the file after the PSEC is done, exit
 if not os.path.isfile(oname+'.txt'):
+	print 'Unable to find %s.txt! Stopping...' % oname
 	exit()
 
 # Samples is a list, and each sample contains
 #  a set of 6 lists which are the channels readings
-
 samples = []
 channels = [[],[],[],[],[],[],[]]
 j = 0
 with open(oname+'.txt', 'r') as f:
 	for line in f:
+		# Skip over header lines
 		if line[0] == '#':
 			continue
 		else:
@@ -88,21 +90,13 @@ bkh.output_file(oname+'.html')
 #create plot object
 p = bkh.figure(plot_width=1000, title=oname, x_axis_label='N', y_axis_label='Voltage, V')
 
-# Read the channels from each sample into long lists for plotting
-channels = [[],[],[],[],[],[]]
-for sample in samples:
-	for i in range(6):
-		for data in sample[i]:
-			channels[i].append(data)
-j = range(len(channels[0]))
-
-# Plot the data
+# Plot data
 col = ['red', 'blue', 'orange', 'green', 'purple', 'black']
-i = 1
-#add data to the plot object
-for channel in channels:
-	p.line(j, channel, legend='Channel '+str(i), line_width=1, line_color=col[i-1])
-	i += 1
+for sample in samples:
+	i = 0
+	for channel in sample[1:]:
+		i+=1
+		p.line(sample[0], channel, legend='Channel '+str(i), line_width=1, line_color=col[i-1])
 
 # set ranges
 p.y_range = Range1d(1.1*vmin, 1.1*vmax)
