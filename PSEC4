@@ -27,7 +27,7 @@ except:
 	DIR = find('TakePed', '/home')[:-12]
 	print DIR
 
-if not os.isfile(DIR+'bin/LogData'):
+if not os.path.exists(DIR):
 	print 'PSEC directory not set! Attempting to search for it...'
 	DIR = find('TakePed', '/home')[:-12]
 	print DIR
