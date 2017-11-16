@@ -6,93 +6,117 @@ from bokeh.models import HoverTool
 import os
 import datetime
 import subprocess
-import tkFileDialog
-import tkMessageBox
+
+def plot_PSEC(fname, oname=''):
+	# takes a PSEC4 log file, reads it and plots it to a bokeh file. 
+	#  <fname> = file to open and read
+	#  <oname> = filename to write to. will be appended with '.html'
+	# Returns:
+	#  <p>     = bokeh plot object for further manipulation, if desired.
+	if oname == '':
+		oname = fname.strip('.txt')
+
+	f = open(fname, 'r')
+
+	# Samples is a list, and each sample contains
+	#  a set of 6 lists which are the channels readings
+	samples = []
+	channels = [[],[],[],[],[],[]]
+	t = [0.0]
+
+	j = 0
+	vmin = 0.
+	vmax = 0.
+	for line in f:
+		if line[0] == '#':
+			continue
+		else:
+			line = [float(x)*1000. for x in line.split()]
+			t.append(t[-1]+0.1) # 100ps step size, or 0.1ns
+			for i in range(6):
+				channels[i].append(line[i])
+				if line[i] > vmax:
+					vmax = float(line[i])
+				if line[i] < vmin:
+					vmin = float(line[i])
+			j += 1
+		if j%256 == 0:
+			samples.append(channels)
+			channels = [[],[],[],[],[],[]]
+
+	f.close() # REMOVE FOR THE MAIN VERSION
+
+	print 'Read %d samples, in %d lines' % (len(samples), j)
+
+	#recover the user inputted name so it can be applied to graphs and whatever
+	stamp = oname.split('/')[-1].strip('.txt').strip('.html')
+	oname = oname.strip('.html')+'.html'
+
+	# output graph to a static HTML file
+	print "saving to %s" % (oname)
+	bkh.output_file(oname, title=stamp)
+
+	#create plot object
+	p = bkh.figure(plot_width=1000, title=stamp, x_axis_label='t-t0, ns', y_axis_label='Voltage, mV')
+
+	# Read the channels from each sample into long lists for plotting
+	channels = [[],[],[],[],[],[]]
+	t = [0.0]
+	for sample in samples:
+		for channel, ochannel in zip(sample, channels):
+			for data in channel:
+				ochannel.append(data)
+	for data in channels[0][1:]:
+		t.append(t[-1]+0.1) # 0.1ns step size
+
+	print 'Plotting...'
+	# Plot the data
+	cols = ['red', 'blue', 'orange', 'green', 'purple', 'black']
+	i = 0
+	data = []
+	#add data to the plot object with ColumnDataSource
+	# line = [<data structure>, <line colour>, <Channel ID>]
+	for channel in channels:
+		i += 1
+		line = [bkh.ColumnDataSource(data=dict(
+					x=t,
+					y=channel),
+					# column_names=['N', 'Voltage']
+					),
+				cols[i-1], # Line colour
+				str(i)     # Channel Number
+				]
+		data.append(line)
+
+	# plot data
+	for line in data:
+		p.line('x', 'y',  
+			line_width=1,
+			line_color=line[1], 
+			legend=('Channel '+line[2]),
+			source=line[0],
+			# tools=['box_select', 'box_zoom', 'pan', 'xpan', 'wheel_zoom', 'undo', 'redo']
+			)
+
+	# Make data toggleable
+	p.legend.location = "top_left"
+	p.legend.click_policy="hide"
+
+	# set ranges
+	p.y_range = Range1d(1.1*vmin, 1.1*vmax)
+
+	bkh.save(p)
+	bkh.show(p)
+	return p
 
 cwd = os.getcwd()
 # Get the data file from a dialogue box adn open it. Also store the filename.
 f = tkFileDialog.askopenfile(mode='rb', initialfile=cwd, title='Select a file', filetypes = (("Text Files","*.txt"),("all files","*.*")))
-oname = f.name
+fname = f.name
+oname = fname
+f.close()
 
-# Samples is a list, and each sample contains
-#  a set of 6 lists which are the channels readings
-samples = []
-channels = [[],[],[],[],[],[]]
+oname = oname.strip('.txt').replace('DATA', 'FIGS')+'.html'
 
-j = 0
-vmin = 0.
-vmax = 0.
-for line in f:
-	if line[0] == '#':
-		continue
-	else:
-		line = [float(x)*1000. for x in line.split()]
-		for i in range(6):
-			channels[i].append(line[i])
-			if line[i] > vmax:
-				vmax = float(line[i])
-			if line[i] < vmin:
-				vmin = float(line[i])
-		j += 1
-	if j%256 == 0:
-		samples.append(channels)
-		channels = [[],[],[],[],[],[]]
+plot_PSEC(fname, oname)
 
-f.close() # REMOVE FOR THE MAIN VERSION
-
-print 'Read out %d samples, in %d lines' % (len(samples), j)
-
-#recover the user inputted name so it can be applied to graphs and whatever
-stamp = oname.split('/')[-1].strip('.txt')
-
-# output graph to a static HTML file
-print "saving to %s" % (oname.strip('.txt').replace('DATA', 'FIGS')+'.html')
-bkh.output_file(oname.replace('DATA', 'FIGS')+'.html', title=stamp)
-
-#create plot object
-p = bkh.figure(plot_width=1000, title=stamp, x_axis_label='N', y_axis_label='Voltage, mV')
-
-# Read the channels from each sample into long lists for plotting
-channels = [[],[],[],[],[],[]]
-for sample in samples:
-	for channel, ochannel in zip(sample, channels):
-		for data in channel:
-			ochannel.append(data)
-j = range(len(channels[0]))
-
-print 'Plotting...'
-# Plot the data
-cols = ['red', 'blue', 'orange', 'green', 'purple', 'black']
-i = 0
-data = []
-#add data to the plot object with ColumnDataSource
-for channel in channels:
-	i += 1
-	line = [bkh.ColumnDataSource(data=dict(
-				x=j,
-				y=channel),
-				# column_names=['N', 'Voltage']
-				),
-			cols[i-1],
-			str(i) ]
-	data.append(line)
-
-# plot data
-for line in data:
-	p.line('x', 'y',  
-		line_width=1,
-		line_color=line[1], 
-		legend=('Channel '+line[2]),
-		source=line[0],
-		# tools=['box_select', 'box_zoom', 'pan', 'xpan', 'wheel_zoom', 'undo', 'redo']
-		)
-
-# Make data toggleable
-p.legend.location = "top_left"
-p.legend.click_policy="hide"
-
-# set ranges
-p.y_range = Range1d(1.1*vmin, 1.1*vmax)
-
-bkh.save(p)
-bkh.show(p)
