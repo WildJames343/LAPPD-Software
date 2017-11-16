@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 import matplotlib.pyplot as plt
 import bokeh.plotting as bkh
 from bokeh.models import Range1d
@@ -108,15 +107,4 @@ def plot_PSEC(fname, oname=''):
 	bkh.save(p)
 	bkh.show(p)
 	return p
-
-cwd = os.getcwd()
-# Get the data file from a dialogue box adn open it. Also store the filename.
-f = tkFileDialog.askopenfile(mode='rb', initialfile=cwd, title='Select a file', filetypes = (("Text Files","*.txt"),("all files","*.*")))
-fname = f.name
-oname = fname
-f.close()
-
-oname = oname.strip('.txt').replace('DATA', 'FIGS')+'.html'
-
-plot_PSEC(fname, oname)
 

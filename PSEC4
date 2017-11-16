@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-import matplotlib.pyplot as plt
 import bokeh.plotting as bkh
 from bokeh.models import Range1d
 from bokeh.models import HoverTool
@@ -8,9 +7,10 @@ import datetime
 import subprocess
 import tkFileDialog
 import tkMessageBox
+import plot_PSEC4 as plt
 
 ### FILEPATH TO PSEC4 CODE DIRECTORY!!! SET THIS!!!!!! ###
-DIR = '/home/wizenedchimp/Documents/LAPPD-Project/run-psec4-master'
+DIR = '/home/wizenedchimp/Documents/LAPPD-Project/run-psec4-master/'
 
 def find(name, path):
     result = ''
@@ -27,8 +27,13 @@ except:
 	DIR = find('TakePed', '/home')[:-12]
 	print DIR
 
+if not os.isfile(DIR+'bin/LogData'):
+	print 'PSEC directory not set! Attempting to search for it...'
+	DIR = find('TakePed', '/home')[:-12]
+	print DIR
+
 os.chdir(DIR)
-print 'working in directory:\n %s' % DIR
+# print 'working in directory:\n %s' % DIR
 
 oname = raw_input('Please enter a filename (blank for automatic):')
 if oname == '':
@@ -52,7 +57,6 @@ while type(N) != int:
 	try:
 		N = int(N)
 	except:
-		print "That's not a number!"
 		i += 1
 		if i > 2:
 			print '...Why are you like this'
@@ -68,87 +72,8 @@ if not os.path.isfile(oname+'.txt'):
 	print 'Unable to find %s.txt! Stopping...' % oname
 	exit()
 
-# Samples is a list, and each sample contains
-#  a set of 6 lists which are the channels readings
-samples = []
-channels = [[],[],[],[],[],[]]
-t = [0.0] # in nanoseconds
+p = plt.plot_PSEC4(oname+'.txt', oname.strip('.txt').replace('DATA', 'FIGS')+'.html')
 
-j = 0
-vmin = 0.
-vmax = 0.
-for line in f:
-	if line[0] == '#':
-		continue
-	else:
-		line = [float(x)*1000. for x in line.split()]
-		for i in range(6):
-			channels[i].append(line[i])
-			t.append(t[-1]+0.1)
-			if line[i] > vmax:
-				vmax = float(line[i])
-			if line[i] < vmin:
-				vmin = float(line[i])
-		j += 1
-	if j%256 == 0:
-		samples.append(channels)
-		channels = [[],[],[],[],[],[]]
-print 'Read out %d samples, in %d lines' % (len(samples), j)
-
-
-#recover the user inputted name so it can be applied to graphs and whatever
-stamp = oname.split('/')[-1].strip('.txt')
-
-# output graph to a static HTML file
-print "saving to %s" % (oname.strip('.txt').replace('DATA', 'FIGS')+'.html')
-bkh.output_file(oname.replace('DATA', 'FIGS')+'.html', title=stamp)
-
-#create plot object
-p = bkh.figure(plot_width=1000, title=stamp, x_axis_label='N', y_axis_label='Voltage, mV')
-
-# Read the channels from each sample into long lists for plotting
-channels = [[],[],[],[],[],[]]
-t = []
-for sample in samples:
-	for channel, ochannel in zip(sample, channels):
-		t.append(t[-1]+0.1) # nanoseconds
-
-		for data in channel:
-			ochannel.append(data)
-
-print 'Plotting...'
-# Plot the data
-cols = ['red', 'blue', 'orange', 'green', 'purple', 'black']
-i = 0
-data = []
-#add data to the plot object with ColumnDataSource
-for channel in channels:
-	i += 1
-	line = [bkh.ColumnDataSource(data=dict(
-				x=t,
-				y=channel),
-				# column_names=['N', 'Voltage']
-				),
-			cols[i-1],
-			str(i) ]
-	data.append(line)
-
-# plot data
-for line in data:
-	p.line('x', 'y',  
-		line_width=1,
-		line_color=line[1], 
-		legend=('Channel '+line[2]),
-		source=line[0],
-		# tools=['box_select', 'box_zoom', 'pan', 'xpan', 'wheel_zoom', 'undo', 'redo']
-		)
-
-# Make data toggleable
-p.legend.location = "top_left"
-p.legend.click_policy="hide"
-
-# set ranges
-p.y_range = Range1d(1.1*vmin, 1.1*vmax)
 
 bkh.save(p)
 bkh.show(p)
