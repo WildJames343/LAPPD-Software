@@ -9,12 +9,12 @@ import subprocess
 
 def plot_PSEC(fname, oname=''):
 	# takes a PSEC4 log file, reads it and plots it to a bokeh file. 
-	#  <fname> = file to open and read
+	#  <fname> = file to open and read. Include .txt extension.
 	#  <oname> = filename to write to. will be appended with '.html'
 	# Returns:
 	#  <p>     = bokeh plot object for further manipulation, if desired.
 	if oname == '':
-		oname = fname.strip('.txt')
+		oname = fname[:-4]
 
 	f = open(fname, 'r')
 
@@ -49,8 +49,10 @@ def plot_PSEC(fname, oname=''):
 	print 'Read %d samples, in %d lines' % (len(samples), j)
 
 	#recover the user inputted name so it can be applied to graphs and whatever
-	stamp = oname.split('/')[-1].strip('.txt').strip('.html')
-	oname = oname.strip('.html')+'.html'
+	stamp = oname.split('/')[-1]
+	oname = oname + '.html'
+
+	# print 'ONAME: %s\nSTAMP: %s' % (oname, stamp)
 
 	# output graph to a static HTML file
 	print "saving to %s" % (oname)

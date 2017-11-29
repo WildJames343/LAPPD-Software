@@ -63,7 +63,7 @@ while type(N) != int:
 		print '\n'
 
 # Ask the PSEC to read the thing, and store it in DATA with the name we want
-command = ['./bin/LogData', (oname), str(N), '0']
+command = ['./bin/LogData', oname, str(N), '0']
 psec = subprocess.Popen(command)
 psec.wait()
 
@@ -72,7 +72,7 @@ if not os.path.isfile(oname+'.txt'):
 	print 'Unable to find %s.txt! Stopping...' % oname
 	exit()
 
-p = plt.plot_PSEC4(oname+'.txt', oname.strip('.txt').replace('DATA', 'FIGS')+'.html')
+p = plt.plot_PSEC(oname+'.txt', oname=oname.replace('DATA', 'FIGS'))
 
 
 bkh.save(p)

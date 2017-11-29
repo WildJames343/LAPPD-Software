@@ -1,0 +1,97 @@
+#!/usr/bin/env python
+import bokeh.plotting as bkh
+import numpy as np
+import os
+import tkFileDialog
+import tkMessageBox
+
+
+cwd = os.getcwd()
+# Get the data file from a dialogue box and open it. Also store the filename.
+f = tkFileDialog.askopenfile(mode='rb', initialfile=cwd, 
+	title='Select a file', filetypes = (("Text Files","*.csv"),("all files","*.*")))
+fname = f.name
+oname = fname
+f.close()
+
+def get_data(fname):
+	f = open(fname, 'r')
+	# Get the metadata. The first column is a label for what it's storing, the second is 
+	#	its numerical value, and the third is the unit. The fourth and fifth columns are
+	#	data.
+	meta = {}
+
+	# Lists for the actual data
+	time = []
+	volt = []
+
+	# get the of the data from the file. It's a CSV, with the first three entries 
+	#	empty (due to storing the metadata)
+	for line in f:
+		line = line.replace('"','').strip().split(',')
+
+		# Check for metadata
+		if line[0] != '':
+			meta[line[0]] = [float(line[1]), line[2]]
+
+		# grab the data, convert to float. Voltage is stored in V, convert to mV.
+		time.append(float(line[3]))
+		volt.append(float(line[4])*10**3)
+
+	if meta['Sample Interval'][1].lower() == 's':
+		print 'Your time interval is in seconds! Converting to nanoseconds.'
+		
+		time = [x*(10**9) for x in time]
+		
+		meta['Sample Interval'][1] = 'ns'
+
+		meta['Trigger Time'][0] *= 10**9
+		meta['Trigger Time'][1] = 'ns'
+
+		meta['Horizontal Offset'][0] *=  10**9
+		meta['Horizontal Offset'][1] =  'ns'
+
+	f.close()
+	return(time, volt, meta)
+
+fname1 = fname
+fname2 = fname.replace('Ch2','Ch3')
+time1, volt1, meta1 = get_data(fname1)
+time2, volt2, meta2 = get_data(fname2)
+
+# Get a filename for the bkh plot
+oname = f.name[:-4]+'.html'
+
+# Set up write file
+print "saving to %s" % (oname)
+bkh.output_file(oname, title=oname)
+
+# Create figure
+title = oname.split('/')[-1][:-4]
+p = bkh.figure(plot_width=1000, title=title, x_axis_label='t-t0, ns', y_axis_label='Voltage, mV')
+
+i = 1
+col = ['red', 'black']
+p.line(
+	x = time1,
+	y = volt1,
+	line_width = 1,
+	legend = 'Channel '+str(i),
+	line_color = col[i-1]
+	)
+
+i = 2
+p.line(
+	x = time2,
+	y = volt2,
+	line_width = 1,
+	legend = 'Channel '+str(i),
+	line_color = col[i-1]
+	)
+
+# Make data toggleable
+p.legend.location = "top_left"
+p.legend.click_policy="hide"
+
+bkh.save(p)
+bkh.show(p)

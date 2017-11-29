@@ -14,7 +14,7 @@ fname = f.name
 oname = fname
 f.close()
 
-oname = oname.strip('.txt').replace('DATA', 'FIGS')+'.html'
+oname = oname.replace('DATA', 'FIGS')+'.html'
 
 p = plt.plot_PSEC(fname, oname)
 
