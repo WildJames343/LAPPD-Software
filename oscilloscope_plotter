@@ -1,45 +1,67 @@
 #!/usr/bin/env python
+#
+# Code written by James Wild, to interpret LAPPD signals read out through either 
+#  a PSEC4 or an oscillscope.
+#  NOTE: PSEC4 functionality temporarily removed, as it was useless for now.
+# 
+# November 2017
+#
+# The purpose of this code is also for me to learn how to use Bokeh, as opposed to matplotlib, since 
+#  it is much more powerful when it comes to data interaction and exploration 
+#  (less lag, HTML output, better interactive tools). Downside is that it's much less comprehensive, 
+#  and the plotting style is absolutely not suitable for publication. 
+#
 import bokeh.plotting as bkh
 import numpy as np
+import scipy.fftpack as sci # We'll try a fourier transform on the data, just in case. 
+#							   Expect no useable output though.
 import os
 import tkFileDialog
+from Tkinter import *
 import tkMessageBox
+import time
 
+from bokeh.layouts import column
 
-cwd = os.getcwd()
-# Get the data file from a dialogue box and open it. Also store the filename.
-f = tkFileDialog.askopenfile(mode='rb', initialfile=cwd, 
-	title='Select a file', filetypes = (("Text Files","*.csv"),("all files","*.*")))
-fname = f.name
-oname = fname
-f.close()
-
-def get_data(fname):
+# Function that reads data from the oscilloscope. Returns a list of [time, volt, metadata]
+def get_scope_data(fname):
 	f = open(fname, 'r')
 	# Get the metadata. The first column is a label for what it's storing, the second is 
 	#	its numerical value, and the third is the unit. The fourth and fifth columns are
-	#	data.
+	#	data in all lines. NOTE: NO SCALE FOR VOLTAGE IS SUPPLIED! ASSUME V?
 	meta = {}
 
 	# Lists for the actual data
 	time = []
 	volt = []
 
+	# initial time offset
+	itime = 0.0
+
 	# get the of the data from the file. It's a CSV, with the first three entries 
 	#	empty (due to storing the metadata)
 	for line in f:
+		# Strings in the file are stored with " about them. We dont care about that.
 		line = line.replace('"','').strip().split(',')
 
 		# Check for metadata
 		if line[0] != '':
 			meta[line[0]] = [float(line[1]), line[2]]
 
-		# grab the data, convert to float. Voltage is stored in V, convert to mV.
-		time.append(float(line[3]))
+		# Grab the data, convert to float.
+		# Scale time so that 0.0ns is the first point.
+		# Assuming voltage is stored in V, convert to mV.
+		time.append(float(line[3])+itime)
 		volt.append(float(line[4])*10**3)
 
+		if itime == 0.0:
+			itime = abs(time[0])
+			time[0] += itime
+	itime = 0.0
+
+	# If the data is stored in seconds, convert to nanoseconds. 
 	if meta['Sample Interval'][1].lower() == 's':
-		print 'Your time interval is in seconds! Converting to nanoseconds.'
+		# print 'Your time interval is in seconds! Converting to nanoseconds.'
 		
 		time = [x*(10**9) for x in time]
 		
@@ -52,46 +74,222 @@ def get_data(fname):
 		meta['Horizontal Offset'][1] =  'ns'
 
 	f.close()
-	return(time, volt, meta)
+	return [time, volt, meta]
 
-fname1 = fname
-fname2 = fname.replace('Ch2','Ch3')
-time1, volt1, meta1 = get_data(fname1)
-time2, volt2, meta2 = get_data(fname2)
 
-# Get a filename for the bkh plot
-oname = f.name[:-4]+'.html'
+# Identify the pulse times. 
+#  I'm using the algorithm described in the following SO post:
+#  https://stackoverflow.com/questions/22583391/peak-signal-detection-in-realtime-timeseries-data
+# Possibly not the fastest algorithm to use, but it is robust which we want. ~1 second for 1000 data, 
+#  and seems to scale roughly linearly at the lengths we care about. 
+def thresholding_algo(y, lag, threshold, influence):
+	# Initalise lists. Signals is the flag list for the data
+    signals = np.zeros(len(y))
+    filteredY = np.array(y)
+    avgFilter = [0]*len(y)
+    stdFilter = [0]*len(y)
+    avgFilter[lag - 1] = np.mean(y[0:lag])
+    stdFilter[lag - 1] = np.std(y[0:lag])
+    for i in range(lag, len(y)):
+    	# Check if data is within the threshold. If it isn't, it's a signal and needs to be 
+    	#  flagged as such.
+        if abs(y[i] - avgFilter[i-1]) > threshold * stdFilter [i-1]:
+            # Make signal be a flag that includes polarity
+            if y[i] > avgFilter[i-1]:
+                signals[i] = 1
+            else:
+                signals[i] = -1
 
-# Set up write file
-print "saving to %s" % (oname)
-bkh.output_file(oname, title=oname)
+            # Calculate the new mean and standard deviation. Make sure that signals have
+            #  contributions in accordance with <influence>
+            filteredY[i] = influence * y[i] + (1 - influence) * filteredY[i-1]
+            avgFilter[i] = np.mean(filteredY[(i-lag):i])
+            stdFilter[i] = np.std(filteredY[(i-lag):i])
+        # Not a signal. Recalcualte mean and std dev.
+        else:
+            signals[i] = 0
+            filteredY[i] = y[i]
+            avgFilter[i] = np.mean(filteredY[(i-lag):i])
+            stdFilter[i] = np.std(filteredY[(i-lag):i])
 
-# Create figure
-title = oname.split('/')[-1][:-4]
-p = bkh.figure(plot_width=1000, title=title, x_axis_label='t-t0, ns', y_axis_label='Voltage, mV')
+    return dict(signals = np.asarray(signals),
+                avgFilter = np.asarray(avgFilter),
+                stdFilter = np.asarray(stdFilter))
 
+# --- Pulse detection settings --- #
+lag = 200        # Consideration window width, in data
+threshold = 4.5  # Threshold for pulse flagging, in standard deviations
+influence = 0    # influence of signals on the mean and SD. We are looking at the same
+				 #  signal each time, not some kind of relative change. Hence, don't 
+				 #  allow signals to influence anything.
+
+# --- MAIN --- #
+cwd = os.getcwd()
+# Get the data file from a dialogue box and open it. Also store the filename.
+root = Tk()
+root.withdraw()
+root.update()
+f = tkFileDialog.askopenfile(mode='rb', initialfile=cwd, 
+	title='Select a file', filetypes = (("Waveform Files","*Wfm_Ch2.csv"),("all files","*.*")))
+root.destroy()
+try:
+	fname = f.name
+except:
+	exit()
+f.close()
+
+
+fnames = []
+# [TEMP] --- Come up with a flexible way of doing this! --- [TEMP] #
+index = fname.index('CAPTURE_')+len('CAPTURE_')
+fname = list(fname)
+# While the next file exists, add it to the list of filenames we're gonna analyse.
 i = 1
-col = ['red', 'black']
-p.line(
-	x = time1,
-	y = volt1,
-	line_width = 1,
-	legend = 'Channel '+str(i),
-	line_color = col[i-1]
-	)
+while os.path.isfile(''.join(fname)):
+	fnames.append(''.join(fname))
+	i += 1
+	fname[index] = str(i)
 
-i = 2
-p.line(
-	x = time2,
-	y = volt2,
-	line_width = 1,
-	legend = 'Channel '+str(i),
-	line_color = col[i-1]
-	)
+done = 0
+for fname in fnames:
+	t0 = time.clock()
+	oname = fname
+	# -- Boleh Fiddling -- #
+	# Get a filename for the bkh plot
+	oname = oname[:-len('Wfm_Ch1.csv')]+'.html'
+	# Set up write file
+	ofile = bkh.output_file(oname, title=oname)
 
-# Make data toggleable
-p.legend.location = "top_left"
-p.legend.click_policy="hide"
+	# Create figure
+	title = oname.split('/')[-1][:-5]
+	# Data
+	p   = bkh.figure(plot_width=1000, title=title+' Signal', 
+		x_axis_label='t-t0, ns', y_axis_label='Voltage, mV')
+	# Fourier transform
+	fft = bkh.figure(plot_width=1000, title='FFT', 
+		x_axis_label='Frequency, GHz', y_axis_label='Strength')
 
-bkh.save(p)
-bkh.show(p)
+	# Channel data storage dictionary. This allows me to pass around arbitrary numbers of channels' 
+	#  data a bit more easily, while keeping it all associated with itself corectly. 
+	# Probably not the ideal way of doing this, but good enough for now...
+	#           ch :[x  y  metadata, signaldata]
+	data = {} # '1':[[],[],{},       {}],
+
+	# -- Get data from files, get pulses, and store lists/arrays -- #
+
+	# Filename will be in the format XXXXXWfm_<Channel><number>.csv
+	#  Search for the other channels, and plot them if they're found.
+	index = fname.index('Ch2')+2  # Get index of the channel number
+	col = ['magenta', 'red', 'black', 'green']
+	i = 0
+	for i in range(1, 5):
+		getname = list(fname)
+		i += 1
+		getname[index] = str(i)
+		getname = ''.join(getname)
+		if os.path.isfile(getname):
+			# print '-- Found waveform: %s' % getname.split('/')[-1]
+			si = str(i)
+			
+			data[si] = get_scope_data(getname)
+
+			t1 = time.clock()
+			data[si].append(thresholding_algo(data[si][1], lag=lag, 
+								threshold=threshold, influence=influence))
+			threshtime = time.clock() - t1
+
+			# Fourier transform of the data, and plot it
+			N = len(data[si][1])
+			T = data[si][2]['Sample Interval'][0]*10**9
+
+			yf = sci.fft(data[si][1]).real
+			xf = np.linspace(0.0, 1/(2.0*T), N).real
+
+			fft.line(x=xf,
+					 y=yf,
+					 color=col[i-1],
+					 legend='Channel '+si,
+					 line_width=1)
+
+
+			# Plot
+			# Data
+			p.line(
+				x = data[si][0],
+				y = data[si][1],
+				line_width = 1,
+				legend = 'Channel '+si,
+				line_color = col[i-1],
+				alpha = 0.3
+				)
+			# Signal
+			p.line(x = data[si][0], 
+				   y = data[si][3]['signals'],
+				   legend = 'Channel '+si+' Signal',
+				   line_width = 1,
+				   line_color = col[i-1],
+				   alpha = 1.0)
+
+			# # averages
+			# p.line(x = data[si][0],
+			# 	   y = data[si][3]['avgFilter'],
+			# 	   legend = 'Channel '+si,
+			# 	   color='cyan'
+			# 	)
+			# p.line(x = data[si][0],
+			# 	   y = data[si][3]['avgFilter']+threshold*data[si][3]['stdFilter'],
+			# 	   legend = 'Channel '+si,
+			# 	   color='green'
+			# 	)
+			# p.line(x = data[si][0],
+			# 	   y = data[si][3]['avgFilter']-threshold*data[si][3]['stdFilter'],
+			# 	   legend = 'Channel '+si,
+			# 	   color='green'
+			# 	)
+	
+	# find the minimum in each signal pulse, and store its time
+	t1 = time.clock()
+	pulses = []
+	for ch in data:
+		channel = data[ch]
+		minV = 0.0
+		minT = 0.0
+		# previous s
+		ps   = 0.0
+		for t, v, s in zip(channel[0], channel[1], channel[3]['signals']):
+			# Only consider data within the pulse
+			if s:
+				if v < minV:
+					minV = v
+					minT = t
+			elif ps and not s:
+				# If no signal now, but was signal before, we've scanned this whole pulse, so 
+				#  store and plot data, and move on.
+				if ps:
+					pulses.append([minT, minV])
+					p.cross(minT, minV, size=20, angle=0.785398, line_width=3, legend='Channel '+ch)
+					minV, minT = 0.0, 0.0
+			ps = s
+		data[ch].append(pulses)
+		pulses = []
+	pulsetime = time.clock()-t1
+
+	# Make data toggleable
+	p.legend.location = "top_left"
+	p.legend.click_policy="hide"
+
+	# Save data
+	t1 = time.clock()
+	out = column(p, fft)
+	bkh.save(out)
+	savetime = time.clock()-t1
+
+	done += 1
+	tottime  = time.clock()-t0
+	# Report how long we're taking
+	print "saving to:\n%s" % (oname)
+	print 'Total time to process:           %.3lfs' % tottime
+	print 'Fraction spent saving:           %.0lf%%' % ((savetime/tottime)*100)
+	print 'Fraction spent signal searching: %.0lf%%' % ((threshtime/tottime)*200)
+	print 'Files Processed:                 %3.0lf%%.' % ((float(done)/float(len(fnames)))*100)
+	print ''
