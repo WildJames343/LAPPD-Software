@@ -3,9 +3,12 @@ import matplotlib.pyplot as plt
 import bokeh.plotting as bkh
 from bokeh.models import Range1d
 from bokeh.models import HoverTool
+from bokeh.models import Span
 import os
 import datetime
 import subprocess
+import read_PSEC
+import numpy as np
 
 def plot_PSEC(fname, oname=''):
 	# takes a PSEC4 log file, reads it and plots it to a bokeh file. 
@@ -16,95 +19,59 @@ def plot_PSEC(fname, oname=''):
 	if oname == '':
 		oname = fname[:-4]
 
-	f = open(fname, 'r')
+	# Read in the data
+	t, samples = read_PSEC.read(fname)
 
-	# Samples is a list, and each sample contains
-	#  a set of 6 lists which are the channels readings
-	samples = []
-	channels = [[],[],[],[],[],[]]
-	t = [0.0]
-
-	j = 0
-	vmin = 0.
-	vmax = 0.
-	for line in f:
-		if line[0] == '#':
-			continue
-		else:
-			line = [float(x)*1000. for x in line.split()]
-			t.append(t[-1]+0.1) # 100ps step size, or 0.1ns
-			for i in range(6):
-				channels[i].append(line[i])
-				if line[i] > vmax:
-					vmax = float(line[i])
-				if line[i] < vmin:
-					vmin = float(line[i])
-			j += 1
-		if j%256 == 0:
-			samples.append(channels)
-			channels = [[],[],[],[],[],[]]
-
-	f.close() # REMOVE FOR THE MAIN VERSION
-
-	print 'Read %d samples, in %d lines' % (len(samples), j)
-
-	#recover the user inputted name so it can be applied to graphs and whatever
+	#recover the user inputted name so it can be applied to graphs
 	stamp = oname.split('/')[-1]
-	oname = oname + '.html'
-
-	# print 'ONAME: %s\nSTAMP: %s' % (oname, stamp)
+	oname = oname
 
 	# output graph to a static HTML file
 	print "saving to %s" % (oname)
 	bkh.output_file(oname, title=stamp)
 
 	#create plot object
-	p = bkh.figure(plot_width=1000, title=stamp, x_axis_label='t-t0, ns', y_axis_label='Voltage, mV')
+	p = bkh.figure(plot_width=1000, title=stamp, x_axis_label='t-t0, ns', 
+			y_axis_label='Voltage, mV')
 
 	# Read the channels from each sample into long lists for plotting
-	channels = [[],[],[],[],[],[]]
-	t = [0.0]
-	for sample in samples:
-		for channel, ochannel in zip(sample, channels):
-			for data in channel:
-				ochannel.append(data)
-	for data in channels[0][1:]:
-		t.append(t[-1]+0.1) # 0.1ns step size
+	channels = np.zeros((6, 0))
+	for S in samples:
+		channels = np.concatenate((channels, samples[S]), axis=1)
 
 	print 'Plotting...'
 	# Plot the data
 	cols = ['red', 'blue', 'orange', 'green', 'purple', 'black']
 	i = 0
-	data = []
-	#add data to the plot object with ColumnDataSource
-	# line = [<data structure>, <line colour>, <Channel ID>]
-	for channel in channels:
-		i += 1
-		line = [bkh.ColumnDataSource(data=dict(
-					x=t,
-					y=channel),
-					# column_names=['N', 'Voltage']
-					),
-				cols[i-1], # Line colour
-				str(i)     # Channel Number
-				]
-		data.append(line)
+	#add data to the plot object
+	for i in range(6):
+		# Plot the lines for each channel
+		p.line(
+				y = channels[i],
+				x = t,
+				line_width = 1,
+				legend=("Channel "+str(i+1)),
+				line_color = cols[i],
+				alpha = 0.3
+				)
 
-	# plot data
-	for line in data:
-		p.line('x', 'y',  
-			line_width=1,
-			line_color=line[1], 
-			legend=('Channel '+line[2]),
-			source=line[0],
-			# tools=['box_select', 'box_zoom', 'pan', 'xpan', 'wheel_zoom', 'undo', 'redo']
-			)
+	vlines = []
+	for i in range(len(samples)):
+		vlines.append(Span(location=25.6*i,
+							dimension='height',
+							line_color='cyan',
+							line_width=2,
+							line_alpha=0.3
+							))
+	p.renderers.extend(vlines)
 
 	# Make data toggleable
 	p.legend.location = "top_left"
 	p.legend.click_policy="hide"
 
 	# set ranges
+	vmin = np.amin(channels)
+	vmax = np.amax(channels)
 	p.y_range = Range1d(1.1*vmin, 1.1*vmax)
 
 	return p

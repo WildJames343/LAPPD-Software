@@ -1,18 +1,29 @@
 #!/usr/bin/env python
 import plot_PSEC4 as plt
 
+import numpy as np
 import os
 import tkFileDialog
 import tkMessageBox
 import bokeh.plotting as bkh
 
-
 cwd = os.getcwd()
 # Get the data file from a dialogue box and open it. Also store the filename.
-f = tkFileDialog.askopenfile(mode='rb', initialfile=cwd, title='Select a file', filetypes = (("Text Files","*.txt"),("all files","*.*")))
-fname = f.name
-oname = fname
+root = Tk()
+root.withdraw()
+root.update()
+f = tkFileDialog.askopenfile(mode='rb', 
+    initialfile=cwd, 
+    title='Select a file', 
+    filetypes = (("txt Files", "*.txt"),("all files","*.*")))
+root.destroy()
+try:
+    fname = f.name
+except:
+    print("No file selected")
+    exit()
 f.close()
+oname = fname
 
 oname = oname.replace('DATA', 'FIGS')+'.html'
 

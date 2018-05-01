@@ -23,8 +23,9 @@ import time
 
 from bokeh.layouts import column
 
-# Function that reads data from the oscilloscope. Returns a list of [time, volt, metadata]
+
 def get_scope_data(fname):
+	'''Function that reads data from the oscilloscope. Returns a list of [time, volt, metadata]'''
 	f = open(fname, 'r')
 	# Get the metadata. The first column is a label for what it's storing, the second is 
 	#	its numerical value, and the third is the unit. The fourth and fifth columns are

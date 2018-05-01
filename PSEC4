@@ -11,6 +11,7 @@ import plot_PSEC4 as plt
 
 ### FILEPATH TO PSEC4 CODE DIRECTORY!!! SET THIS!!!!!! ###
 DIR = '/home/wizenedchimp/Documents/LAPPD-Project/run-psec4-master/'
+DIR = '/home/wizenedchimp/Downloads'
 
 def find(name, path):
     result = ''
