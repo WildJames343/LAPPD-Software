@@ -29,5 +29,10 @@ oname = oname.replace('DATA', 'FIGS')+'.html'
 
 p = plt.plot_PSEC(fname, oname)
 
+directory = oname.split('/')[:-1]
+directory = '/'.join(directory)
+if not os.path.exists(directory):
+    os.makedirs(directory)
+
 bkh.save(p)
 bkh.show(p)
