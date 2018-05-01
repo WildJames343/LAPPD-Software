@@ -3,6 +3,7 @@ import plot_PSEC4 as plt
 
 import numpy as np
 import os
+from Tkinter import *
 import tkFileDialog
 import tkMessageBox
 import bokeh.plotting as bkh
