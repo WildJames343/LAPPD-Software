@@ -15,6 +15,7 @@ import tkFileDialog
 import tkMessageBox
 import bokeh.plotting as bkh
 from scipy import optimize
+from bokeh.models import Span
 
 def gaussian(x, height, center, width):
     return height*np.exp(-(x - center)**2/(2*width**2))
