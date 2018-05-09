@@ -120,6 +120,16 @@ if plot:
             color='black',
             legend='Gaussians Fits')
 
+    vlines = []
+    for i in range(len(samples)):
+        vlines.append(Span(location=25.6*i,
+                            dimension='height',
+                            line_color='cyan',
+                            line_width=2,
+                            line_alpha=0.3
+                            ))
+    p.renderers.extend(vlines)
+
     # Make data toggleable
     p.legend.location = "top_left"
     p.legend.click_policy="hide"
