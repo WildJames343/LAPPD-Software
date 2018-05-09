@@ -1,0 +1,192 @@
+#!/usr/bin/env python
+# Fit a double gaussian to a Oscilloscope data file
+## REQUIRES THE FILE TO BE CALLED 'SaveOnEvent*Wfm.csv' !!##
+
+import plot_PSEC4 as plt
+import read_PSEC as psec
+
+import numpy as np
+import os
+from Tkinter import *
+import tkFileDialog
+import tkMessageBox
+import bokeh.plotting as bkh
+from scipy import optimize
+
+def gaussian(x, height, center, width):
+    return height*np.exp(-(x - center)**2/(2*width**2))
+
+def two_gaussians(x, h1, c1, w1, h2, c2, w2, offset=0):
+    return (gaussian(x, h1, c1, w1) +
+        gaussian(x, h2, c2, w2) + offset)
+
+def get_scope_data(fname):
+    '''Function that reads data from the oscilloscope. 
+    Returns a list of [time, volt, metadata]'''
+    f = open(fname, 'r')
+    # Get the metadata. The first column is a label for what it's storing, 
+    #   the second is its numerical value, and the third is the unit. The 
+    #   fourth and fifth columns are data in all lines. NOTE: NO SCALE FOR 
+    #   VOLTAGE IS SUPPLIED! ASSUME V?
+    meta = {}
+
+    # Lists for the actual data
+    time = []
+    volt = []
+
+    # initial time offset
+    itime = 0.0
+
+    # get the of the data from the file. It's a CSV, with the first three entries 
+    #   empty (due to storing the metadata)
+    for line in f:
+        # Strings in the file are stored with " about them. We dont care about that.
+        line = line.replace('"','').strip().split(',')
+
+        # Check for metadata
+        if line[0] != '':
+            meta[line[0]] = [float(line[1]), line[2]]
+
+        # Grab the data, convert to float.
+        # Scale time so that 0.0ns is the first point.
+        # Assuming voltage is stored in V, convert to mV.
+        time.append(float(line[3])+itime)
+        volt.append(float(line[4])*10**3)
+
+        if itime == 0.0:
+            itime = abs(time[0])
+            time[0] += itime
+    itime = 0.0
+
+    # If the data is stored in seconds, convert to nanoseconds. 
+    if meta['Sample Interval'][1].lower() == 's':
+        # print 'Your time interval is in seconds! Converting to nanoseconds.'
+        
+        time = [x*(10**9) for x in time]
+        
+        meta['Sample Interval'][1] = 'ns'
+
+        meta['Trigger Time'][0] *= 10**9
+        meta['Trigger Time'][1] = 'ns'
+
+        meta['Horizontal Offset'][0] *=  10**9
+        meta['Horizontal Offset'][1] =  'ns'
+
+    f.close()
+    return time, volt, meta
+
+
+cwd = os.getcwd()
+# Get the data file from a dialogue box and open it. Also store the filename.
+root = Tk()
+root.withdraw()
+root.update()
+f = tkFileDialog.askopenfile(mode='rb', 
+    initialfile=cwd, 
+    title='Select a file', 
+    filetypes = (("CSV Files", "*.csv"),("all files","*.*")))
+root.destroy()
+try:
+    fname = f.name
+except:
+    print("No file selected")
+    exit()
+f.close()
+
+fnames = []
+# [TEMP] --- Come up with a flexible way of doing this! --- [TEMP] #
+index = fname.index('SaveOnEvent')+len('SaveOnEvent')
+fname = list(fname)
+# While the next file exists, add it to the list of filenames we're gonna analyse.
+i = 1
+while os.path.isfile(''.join(fname)):
+    fnames.append(''.join(fname))
+    i += 1
+    fname[index] = str(i)
+
+# fname = fnames[0]
+
+electronVelocities = []
+
+plot = False
+
+for fname in fnames:
+    # Read in the raw data
+    ts, volts, metadata = get_scope_data(fname)
+
+    ## Fit a double gaussian to the data ##
+    ts = np.array(ts)
+    volts = np.array(volts)
+
+    # Chisq error function
+    errfunc = lambda p, x, y: (two_gaussians(x, *p) - y)**2
+
+    # Guess the locations of the gaussians
+    halfmax_volt = 0.5 * np.amin(volts)
+    halfmax_t1 = np.argmax(volts<halfmax_volt)
+    halfmax_t1 = ts[halfmax_t1]
+
+           #   h1,   c1,   w1]
+    guess = [halfmax_volt, halfmax_t1, 0.1,
+            halfmax_volt, halfmax_t1+1.5, 0.1]
+
+    # Optimise gaussian fit
+    optim, success = optimize.leastsq(errfunc, guess[:], args=(ts, volts))
+
+    # Get the time differences
+    time_difference = abs(optim[4]-optim[1])
+    # Calculate the velocity, store it
+    electronVelocities.append(12e-7/time_difference)
+
+    # print("Found two gaussians with the following:")
+    # print("Peak 1:\nHeight: %2.2lf\nCenter: %2.2lf\nWidth: %2.2lf\n" % 
+    #     (optim[0], optim[1], optim[2] ) )
+    # print("Peak 2:\nHeight: %2.2lf\nCenter: %2.2lf\nWidth: %2.2lf\n" % 
+    #     (optim[3], optim[4], optim[5] ) )
+    # print("Time difference: %2.3lfns, giving an electron velocity of %.3gm/s" % 
+    #     (time_difference, (12e-7/time_difference)) )
+
+    if plot:
+        # -- Boleh Fiddling -- #
+        # Set up write file
+        ofile = bkh.output_file(fname.replace('.csv', '.html'), title=fname)
+
+        # Create figure
+        title = fname.split('/')[-1][:-5]
+        # Data
+        p   = bkh.figure(plot_width=1000, title=title+' Signal', 
+            x_axis_label='t-t0, ns', y_axis_label='Voltage, mV', )
+
+        p.line(x=ts,
+                y=volts,
+                color='red',
+                legend='Data',
+                line_width=1)
+        
+        p.line(ts, 
+                two_gaussians(ts, *optim),
+                line_width=1,
+                color='black',
+                legend='Fit of 2 Gaussians')
+
+
+        directory = fname.split('/')[:-1]
+        directory = '/'.join(directory)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+
+        # Make data toggleable
+        p.legend.location = "top_left"
+        p.legend.click_policy="hide"
+
+        bkh.save(p)
+
+electronVelocities = np.array(electronVelocities)
+
+meanVelocity = np.mean(electronVelocities)
+devVelocity  = np.std(electronVelocities)
+maxVelocity  = electronVelocities.max()
+
+print("From the files, we have a max velocity of %.2gm/s, a mean velocity of %.2gm/s, and a standard deviation of %.2gm/s." 
+    % (maxVelocity, meanVelocity, devVelocity))

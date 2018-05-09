@@ -4,11 +4,13 @@ import datetime
 import subprocess
 import numpy as np
 
-def read(fname, oname=''):
+def read(fname):
     '''takes a PSEC4 log file, reads it and plots it to a bokeh file. 
      <fname> = file to open and read
-    Returns:
-     <samples> = A dictionary containing the data samples.'''
+    Returns: t, samples
+     <t> = a numpy array that has the time axis
+     <samples> = A dictionary containing the data samples. Each sample is a 
+            6x256 numpy array with the data in.'''
 
     if not os.path.isfile(fname):
         print("ERROR: File not found...")
