@@ -113,11 +113,11 @@ for key, sample in samples.iteritems():
     # Calculate the velocity, store it
     velocity = 2*(0.06-position)/(time_difference)
     if velocity > 3e8:
-        # print("Bad sample! Discarded. dt = %.2g, v = %.2g" 
-            # % (time_difference, velocity))
-    elif velocity < 3e8 and velocity > 1e8:
+        print("Bad sample! Discarded. dt = %.2g, v = %.2g" 
+            % (time_difference, velocity))
+    # elif velocity < 3e8 and velocity > 1e8:
         # print("GOOD SAMPLE:")
-        electronVelocities.append(velocity)
+        # electronVelocities.append(velocity)
     else:
         electronVelocities.append(velocity)
 
