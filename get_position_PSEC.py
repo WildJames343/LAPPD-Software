@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 # Fit a double gaussian to a PSEC logfile
 
-import plot_PSEC4 as plt
+import matplotlib.pyplot as plt
 import read_PSEC as psec
 
 import numpy as np
-import matplotlib.pyplot as mpl
 import os
 from Tkinter import *
 import tkFileDialog
@@ -59,10 +58,10 @@ ts = np.arange(0.0, 25.6, 0.1)
 
 ch = raw_input("What channel on the PSEC? (1-6): ")
 ch = int(ch)-1
-position = float(raw_input("What position on the tile are we at (cm): "))/100
+# position = float(raw_input("What position on the tile are we at (cm): "))/100
+electronVelocity = 2.0e8
 
-electronVelocities = []
-time_differences = {}
+positions = []
 
 if plot:
     # -- Boleh Fiddling -- #
@@ -111,74 +110,15 @@ for key, sample in samples.iteritems():
     
     # Get the time differences
     time_difference = abs(optim[4]-optim[1])*1e-9 # Convert to ns
-    time_differences[key] = time_difference
 
-    # Calculate the velocity, store it
-    velocity = 2*(0.06-position)/(time_difference)
-    if velocity > 3e8:
-        print("Bad sample! Discarded. dt = %.2g, v = %.2g" 
-            % (time_difference, velocity))
-    # elif velocity < 3e8 and velocity > 1e8:
-        # print("GOOD SAMPLE:")
-        # electronVelocities.append(velocity)
-    else:
-        electronVelocities.append(velocity)
+    # Calculate the position
+    position = 0.06 - (.5*time_difference * electronVelocity)
 
-    # print("t0: %.2lf\ndt: %2.2g\nVelocity: %2.2g\nchisq: %lf\n---------------" %
-        # (25.6*int(key), time_difference, velocity, chisq))
+    if position > 0.0 and position < 0.05:
+        positions.append(position)
 
-    if plot:
-        big_volts.append(volts)
-        all_gaussians.append(two_gaussians(ts, *optim))
-        all_guesses.append(two_gaussians(ts, *guess))
-
-
-if plot:
-    big_volts = np.array(big_volts).flatten()
-    all_gaussians = np.array(all_gaussians).flatten()
-    all_guesses = np.array(all_guesses).flatten()
-    p.line(x=big_ts,
-            y=big_volts,
-            color='red',
-            legend='Data',
-            line_width=1)
-    
-    p.line(big_ts, 
-            all_gaussians,
-            line_width=1,
-            color='black',
-            legend='Gaussians Fits')
-
-    p.line(big_ts, 
-            all_guesses,
-            line_width=1,
-            color='purple',
-            legend='Gaussians guesses')
-
-    vlines = []
-    for i in range(len(samples)):
-        vlines.append(Span(location=25.6*i,
-                            dimension='height',
-                            line_color='cyan',
-                            line_width=2,
-                            line_alpha=0.5
-                            ))
-    p.renderers.extend(vlines)
-
-    # Make data toggleable
-    p.legend.location = "top_left"
-    p.legend.click_policy="hide"
-
-    bkh.save(p)
-    bkh.show(p)
-
-electronVelocities = np.array(electronVelocities)
-
-meanVelocity = np.mean(electronVelocities)
-devVelocity  = np.std(electronVelocities)
-maxVelocity  = np.amax(electronVelocities)
-
-print("From the files, we have a max velocity of %.2gm/s, a mean velocity of %.2gm/s, and a standard deviation of %.2gm/s." 
-    % (maxVelocity, meanVelocity, devVelocity))
-
-mpl.hist()
+plt.hist(positions, facecolor='green', edgecolor='black', bins=12)
+plt.title("Positions of signals")
+plt.ylabel('Frequency')
+plt.xlabel('Position, cm')
+plt.show()
