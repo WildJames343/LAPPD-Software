@@ -60,6 +60,7 @@ ch = raw_input("What channel on the PSEC? (1-6): ")
 ch = int(ch)-1
 # position = float(raw_input("What position on the tile are we at (cm): "))/100
 electronVelocity = 2.0e8
+dt = 100e-12 # 100ps time resolution
 
 positions = []
 gains = []
@@ -127,9 +128,10 @@ for key, sample in samples.iteritems():
     # Make an array of the values that exceed our computed noise level
     pulse = np.where(volts < lowerlim)
     # Sum that array
-    integrated_voltage = np.sum(pulse)/1000
+    integrated_voltage = np.sum(pulse)*dt/1000
 
-    # Calculate the gain, assuming a single PE
+    # Calculate the gain, assuming a single PE. 
+    #  (integrated V)/(electron charge * resistance)
     gain = integrated_voltage / (-1.6e-19 * 50)
 
     if position > 0.0 and position < 0.058:
@@ -153,7 +155,21 @@ plt.show()
 # Ordered lists of gain and position
 positions, gains = zip(*sorted(zip(positions, gains)))
 
-plt.plot(positions, gains, linestyle=None, marker='x')
+# Smooth the gain data with a moving average, with a window 1/10th the 
+#  number of data since our position resolution is only actually accurate to 
+#  1cm on a 6cm tile.
+window_len = int(len(gains)/10)
+
+# Get a cumulative sum, so each cell is the sum of all that came before it
+gains = np.cumsum(gains, dtype=float)
+
+# subtract the other side of the window to isolate the sum of JUST the window
+gains[window_len:] = gains[window_len:] - gains[:-window_len]
+
+# divide by the window size, so that it's a mean.
+gains = gains[window_len-1:]/window_len
+
+plt.scatter(positions, gains, color='green')
 plt.title('Gain as a function of position')
 plt.xlabel("Position, cm")
 plt.ylabel("Gain")
