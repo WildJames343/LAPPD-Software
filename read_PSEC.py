@@ -35,14 +35,19 @@ def read(fname):
             # voltage is stored in Volts, convert to mV.
             line = [float(x)*1000. for x in line.split()]
             
-            # Get the data for each channel into the lists
-            for i in range(6):
-                channels[i][j%256] = line[i]
-                if line[i] > vmax:
-                    vmax = float(line[i])
-                if line[i] < vmin:
-                    vmin = float(line[i])
-            j += 1
+            try:
+                # Get the data for each channel into the lists
+                for i in range(6):
+                    channels[i][j%256] = line[i]
+                    if line[i] > vmax:
+                        vmax = float(line[i])
+                    if line[i] < vmin:
+                        vmin = float(line[i])
+                j += 1
+            except:
+                # Catch if the file's line is incomplete
+                print("ERROR: bad line")
+                print(line)
         # If I detect a header, 
         if j%256 == 0:
             samples[str(n)] = channels.copy()

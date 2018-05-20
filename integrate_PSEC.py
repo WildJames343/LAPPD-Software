@@ -48,9 +48,9 @@ for k in keys:
     sample = samples[k]
 
     # Establish the noise level from channel 5
-    zeropoint = np.mean(sample[-2])
+    zeropoint = np.mean(sample[3])
     # Get the standard deviation of the noise
-    scatter = np.std(sample[-2])
+    scatter = np.std(sample[3])
     # Sum data that are more than 3.5 sigma from the mean
     lowerlim = zeropoint - (3*scatter)
 
@@ -80,16 +80,17 @@ print("The mean integrated voltage from this file is %.2g Vs" %
 #  photoelectron
 gains = sums / (-1.6e-19 * 50)
 
+gains = gains[np.where(gains < 2e7)]
+
 # Assume gains is one half of a normal distribution?
-gains2 = -1 * gains
-dev   = np.concatenate((gains, gains2))
-dev = 0.5 * np.std(dev)
+dev = np.std(gains)
 
-print("The mean gain from this file is %.2g" %
-        (np.mean(gains)))
+print("The mean gain from this file is %.4g +/- %.4g" %
+        (np.mean(gains), dev))
 
-# plt.hist(gains, bins=15, color='red')
-# plt.xlabel("Gain")
-# plt.ylabel("Frequency")
+plt.hist(gains/1e6, facecolor='green', edgecolor='black', bins=25)
+plt.xlabel("Gain, 1e6")
+plt.ylabel("Frequency")
 # plt.title("The distribution of gains for test\n%s" % fname.split('/')[-1])
-# plt.show()
+plt.tight_layout()
+plt.show()

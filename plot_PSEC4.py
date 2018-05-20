@@ -49,10 +49,10 @@ def plot_PSEC(fname, oname=''):
 		p.line(
 				y = channels[i],
 				x = t,
-				line_width = 1,
+				line_width = 2,
 				legend=("Channel "+str(i+1)),
 				line_color = cols[i],
-				alpha = 0.3
+				# alpha = 0.3
 				)
 
 	vlines = []

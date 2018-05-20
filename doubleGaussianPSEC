@@ -15,7 +15,7 @@ from scipy import optimize
 from bokeh.models import Span
 
 # Toggle plotting
-plot = 1
+plot = 0
 
 def chisquare(fobs, fgen):
     chi = 0.0
@@ -59,7 +59,7 @@ ts = np.arange(0.0, 25.6, 0.1)
 
 ch = raw_input("What channel on the PSEC? (1-6): ")
 ch = int(ch)-1
-position = float(raw_input("What position on the tile are we at (cm): "))/100
+position = float(raw_input("What position on the tile are we at (cm): "))/100.
 
 electronVelocities = []
 time_differences = {}
@@ -82,9 +82,6 @@ if plot:
 
 
 for key, sample in samples.iteritems():
-    # Read in the raw data
-    volts = sample[ch]
-
     ## Fit a double gaussian to the data ##
     volts = sample[ch,:]
 
@@ -110,18 +107,12 @@ for key, sample in samples.iteritems():
     chisq = chisquare(volts, two_gaussians(ts, *optim))
     
     # Get the time differences
-    time_difference = abs(optim[4]-optim[1])*1e-9 # Convert to ns
+    time_difference = abs(optim[4]-optim[1])*1e-9 # Convert s to ns
     time_differences[key] = time_difference
 
     # Calculate the velocity, store it
     velocity = 2*(0.06-position)/(time_difference)
-    if velocity > 3e8:
-        print("Bad sample! Discarded. dt = %.2g, v = %.2g" 
-            % (time_difference, velocity))
-    # elif velocity < 3e8 and velocity > 1e8:
-        # print("GOOD SAMPLE:")
-        # electronVelocities.append(velocity)
-    else:
+    if velocity < 3e8:
         electronVelocities.append(velocity)
 
     # print("t0: %.2lf\ndt: %2.2g\nVelocity: %2.2g\nchisq: %lf\n---------------" %
@@ -172,13 +163,26 @@ if plot:
     bkh.save(p)
     bkh.show(p)
 
+
+# time_differences_ps = [i*1e12 for i in list(time_differences.values()) if i < 1e-9]
+# for i in time_differences_ps:
+#     print("%.2lfps" % i)
+
+# mpl.hist(time_differences_ps)
+# mpl.show()
+
 electronVelocities = np.array(electronVelocities)
 
 meanVelocity = np.mean(electronVelocities)
 devVelocity  = np.std(electronVelocities)
 maxVelocity  = np.amax(electronVelocities)
 
-print("From the files, we have a max velocity of %.2gm/s, a mean velocity of %.2gm/s, and a standard deviation of %.2gm/s." 
-    % (maxVelocity, meanVelocity, devVelocity))
+print("From %d files, we have a max velocity of %.2gm/s, a mean velocity of %.2gm/s, and a standard deviation of %.2gm/s." 
+    % (len(electronVelocities), maxVelocity, meanVelocity, devVelocity))
 
-mpl.hist()
+mpl.hist(electronVelocities)
+mpl.title(fname.split('/')[-1]+' velocities')
+mpl.xlabel('Velocity')
+mpl.ylabel('Frequency')
+oname = fname.replace('.txt', '')
+mpl.savefig(oname)

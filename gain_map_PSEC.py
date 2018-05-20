@@ -50,8 +50,6 @@ except:
     exit()
 f.close()
 
-# Get the data
-big_ts, samples = psec.read(fname)
 
 #Make a maller version of ts to use for individual samples
 ts = np.arange(0.0, 25.6, 0.1)
@@ -59,36 +57,19 @@ ts = np.arange(0.0, 25.6, 0.1)
 ch = raw_input("What channel on the PSEC? (1-6): ")
 ch = int(ch)-1
 # position = float(raw_input("What position on the tile are we at (cm): "))/100
-electronVelocity = 2.0e8
+electronVelocity = 6e7
 dt = 100e-12 # 100ps time resolution
 
+# Initialise data storage
 positions = []
 gains = []
 measurements = {}
 
-if plot:
-    # -- Boleh Fiddling -- #
-    # Set up write file
-    oname = fname.replace('.txt', '.html')
-    ofile = bkh.output_file(fname.replace('.txt', '.html'), title=fname)
-
-    # Create figure
-    title = fname.split('/')[-1][:-5]
-    # Data
-    p   = bkh.figure(plot_width=1000, title=title+' Signal', 
-        x_axis_label='t-t0, ns', y_axis_label='Voltage, mV', )
-
-    big_volts = []
-    all_gaussians = []
-    all_guesses = []
-
-
-for key, sample in samples.iteritems():
-    # Read in the raw data
-    volts = sample[ch]
-
+def analyse(sample):
     ## Fit a double gaussian to the data ##
     volts = sample[ch,:]
+    #Make a maller version of ts to use for individual samples
+    ts = np.arange(0.0, 25.6, 0.1)
 
     # Chisq error function
     errfunc = lambda p, x, y: (two_gaussians(x, *p) - y)**2
@@ -101,6 +82,7 @@ for key, sample in samples.iteritems():
     halfmax_t2 = np.argmax(volts[::-1] < halfmax_volt)
     halfmax_t2 = ts[-1*halfmax_t2]
 
+    # Initial solution guesses two peaks at the leading abd trailing edges
            #   h1,   c1,   w1]
     guess = [halfmax_volt, halfmax_t1, 0.1,
             halfmax_volt, halfmax_t2, 0.1,
@@ -123,54 +105,89 @@ for key, sample in samples.iteritems():
     # Get the standard deviation of the noise
     scatter = np.std(sample[-1])
     # Sum data that are more than 3 sigma from the mean
-    lowerlim = zeropoint - (3*scatter)
+    lowerlim = zeropoint - (3.5*scatter)
 
     # Make an array of the values that exceed our computed noise level
     pulse = np.where(volts < lowerlim)
+    pulse = volts[pulse]
+
     # Sum that array
-    integrated_voltage = np.sum(pulse)*dt/1000
+    integrated_voltage = np.sum(pulse)*dt
 
     # Calculate the gain, assuming a single PE. 
     #  (integrated V)/(electron charge * resistance)
     gain = integrated_voltage / (-1.6e-19 * 50)
 
-    if position > 0.0 and position < 0.058:
-        positions.append(position*100.)
-        gains.append(gain)
-        measurements[key] = [position, gain]
+    return time_difference, gain, position
+
+with open(fname, 'r') as f:
+    sample = np.zeros((6, 256))
+    i = 0
+    for line in f:
+        if line[0] == '#':
+            continue
+        if i == 256:
+            # Get the analysis
+            time_difference, gain, position = analyse(sample)
+            # If its a signal, store it
+            if position > 0.0 and position < 0.058:
+                positions.append(position)
+                gains.append(gain)
+            # Reset array
+            sample = np.zeros((6,256))
+            i = 0
+
+        # Read the data into array
+        sample[:,i] = np.array([float(x) for x in line.split()])[:6]
+        i += 1
 
 
-plt.hist(positions, facecolor='green', edgecolor='black', bins=12)
+
+plt.hist(positions, facecolor='green', edgecolor='black', bins=24)
 plt.title("Positions of signals")
 plt.ylabel('Frequency')
 plt.xlabel('Position, cm')
-plt.show()
+plt.savefig(fname[:-4]+'_pos')
+plt.clf()
 
-plt.hist(gains, facecolor='green', edgecolor='black', bins=12)
+plt.hist(np.array(gains)/1e6, facecolor='green', edgecolor='black', bins=24)
 plt.title("Gains of signals")
 plt.ylabel('Frequency')
-plt.xlabel('Gain')
-plt.show()
+plt.xlabel('Gain, 10^6')
+plt.savefig(fname[:-4]+'_gains')
+plt.clf()
 
-# Ordered lists of gain and position
-positions, gains = zip(*sorted(zip(positions, gains)))
+oname = fname[:-4]+'_gains.txt'
+with open(oname, 'w') as f:
+    for position, gain in zip(positions, gains):
+        f.write("%lf, %lf\n" % (position, gain))
+
 
 # Smooth the gain data with a moving average, with a window 1/10th the 
 #  number of data since our position resolution is only actually accurate to 
 #  1cm on a 6cm tile.
-window_len = int(len(gains)/10)
+window_len = int(len(gains)/5)
+
+# Ordered lists of gain and position
+positions, gains = zip(*sorted(zip(positions, gains)))
 
 # Get a cumulative sum, so each cell is the sum of all that came before it
 gains = np.cumsum(gains, dtype=float)
-
 # subtract the other side of the window to isolate the sum of JUST the window
 gains[window_len:] = gains[window_len:] - gains[:-window_len]
 
 # divide by the window size, so that it's a mean.
 gains = gains[window_len-1:]/window_len
 
-plt.scatter(positions, gains, color='green')
+# The same for position
+positions = np.cumsum(positions, dtype=float)
+positions[window_len:] = positions[window_len:] - positions[:-window_len]
+positions = positions[window_len-1:]/window_len
+
+plt.plot(positions, gains/1e6, color='green')
 plt.title('Gain as a function of position')
 plt.xlabel("Position, cm")
-plt.ylabel("Gain")
-plt.show()
+plt.ylabel("Gain, 10^6")
+plt.savefig(fname[:-4]+'_gainPos')
+plt.clf()
+

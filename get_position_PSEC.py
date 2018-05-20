@@ -14,7 +14,7 @@ from scipy import optimize
 from bokeh.models import Span
 
 # Toggle plotting
-plot = 1
+plot = 0
 
 def chisquare(fobs, fgen):
     chi = 0.0
@@ -59,7 +59,7 @@ ts = np.arange(0.0, 25.6, 0.1)
 ch = raw_input("What channel on the PSEC? (1-6): ")
 ch = int(ch)-1
 # position = float(raw_input("What position on the tile are we at (cm): "))/100
-electronVelocity = 2.0e8
+electronVelocity = 6e7
 
 positions = []
 
@@ -81,10 +81,8 @@ if plot:
 
 
 for key, sample in samples.iteritems():
-    # Read in the raw data
-    volts = sample[ch]
-
     ## Fit a double gaussian to the data ##
+    # Get channel data
     volts = sample[ch,:]
 
     # Chisq error function
@@ -115,9 +113,13 @@ for key, sample in samples.iteritems():
     position = 0.06 - (.5*time_difference * electronVelocity)
 
     if position > 0.0 and position < 0.05:
-        positions.append(position)
+        positions.append(position*100)
+    # positions.append(position*100)
 
-plt.hist(positions, facecolor='green', edgecolor='black', bins=12)
+print(np.mean(np.array(positions)))
+print(np.std(np.array(positions)))
+
+plt.hist(positions, facecolor='green', edgecolor='black', bins=30, range=[0, 6])
 plt.title("Positions of signals")
 plt.ylabel('Frequency')
 plt.xlabel('Position, cm')
