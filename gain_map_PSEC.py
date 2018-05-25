@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-# Fit a double gaussian to a PSEC logfile
+# Get the gains and locations of each signal in the sample. Summarise this data,
+#  and write it out to a file so I can draw several channels together into a 
+#  full gain map.
 
 import matplotlib.pyplot as plt
 import read_PSEC as psec
@@ -57,7 +59,7 @@ ts = np.arange(0.0, 25.6, 0.1)
 ch = raw_input("What channel on the PSEC? (1-6): ")
 ch = int(ch)-1
 # position = float(raw_input("What position on the tile are we at (cm): "))/100
-electronVelocity = 6e7
+electronVelocity = 1.2e8
 dt = 100e-12 # 100ps time resolution
 
 # Initialise data storage
@@ -141,19 +143,23 @@ with open(fname, 'r') as f:
         sample[:,i] = np.array([float(x) for x in line.split()])[:6]
         i += 1
 
-
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
 
 plt.hist(positions, facecolor='green', edgecolor='black', bins=24)
 plt.title("Positions of signals")
 plt.ylabel('Frequency')
 plt.xlabel('Position, cm')
+plt.tight_layout()
 plt.savefig(fname[:-4]+'_pos')
 plt.clf()
 
-plt.hist(np.array(gains)/1e6, facecolor='green', edgecolor='black', bins=24)
-plt.title("Gains of signals")
+lg_gains = np.log10(np.array(gains))
+
+plt.hist(lg_gains, facecolor='green', edgecolor='black', bins=24)
 plt.ylabel('Frequency')
-plt.xlabel('Gain, 10^6')
+plt.xlabel(r'$log_{10}$(Gain)')
+plt.tight_layout()
 plt.savefig(fname[:-4]+'_gains')
 plt.clf()
 
@@ -162,6 +168,9 @@ with open(oname, 'w') as f:
     for position, gain in zip(positions, gains):
         f.write("%lf, %lf\n" % (position, gain))
 
+
+gains = gains[gains > 1e6]
+print("Mean: %.3g\nstd.dev: %.3g" % (np.mean(gains), np.std(gains)))
 
 # Smooth the gain data with a moving average, with a window 1/10th the 
 #  number of data since our position resolution is only actually accurate to 

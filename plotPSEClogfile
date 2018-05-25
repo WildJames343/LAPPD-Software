@@ -8,6 +8,8 @@ import tkFileDialog
 import tkMessageBox
 import bokeh.plotting as bkh
 
+## Quickly plot a PSEC log file ##
+
 cwd = os.getcwd()
 # Get the data file from a dialogue box and open it. Also store the filename.
 root = Tk()

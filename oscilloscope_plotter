@@ -7,9 +7,9 @@
 # November 2017
 #
 # The purpose of this code is also for me to learn how to use Bokeh, as opposed to matplotlib, since 
-#  it is much more powerful when it comes to data interaction and exploration 
+#  it is much faster when it comes to data interaction and exploration 
 #  (less lag, HTML output, better interactive tools). Downside is that it's much less comprehensive, 
-#  and the plotting style is absolutely not suitable for publication. 
+#  and the plotting style is not suitable for publication. 
 #
 import bokeh.plotting as bkh
 import numpy as np

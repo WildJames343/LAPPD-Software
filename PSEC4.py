@@ -1,76 +1,84 @@
-import matplotlib.pyplot as plt
+#!/usr/bin/env python
 import bokeh.plotting as bkh
+from bokeh.models import Range1d
+from bokeh.models import HoverTool
 import os
 import datetime
 import subprocess
+import tkFileDialog
+import tkMessageBox
+import plot_PSEC4 as plt
 
 ### FILEPATH TO PSEC4 CODE DIRECTORY!!! SET THIS!!!!!! ###
-DIR = '/home/wizenedchimp/Documents/LAPPD-Project/run-psec4-master'
+DIR = '/home/wizenedchimp/Documents/LAPPD-Project/run-psec4-master/'
+DIR = '/home/wizenedchimp/Downloads'
+
+# Recursively searches for a file, in the path given
+def find(name, path):
+    result = ''
+    for root, dirs, files in os.walk(path):
+        if name in files:
+            result = os.path.join(root, name)
+            break
+    return result
+
+# Get the PSEC directory and change into it
+try:
+	DIR
+except:
+	print 'PSEC directory not set! Attempting to search for it...'
+	DIR = find('TakePed', '/home')[:-12]
+	print DIR
+
+if not os.path.exists(DIR):
+	print 'PSEC directory not set! Attempting to search for it...'
+	DIR = find('TakePed', '/home')[:-12]
+	print DIR
+
+os.chdir(DIR)
+print 'working in directory:\n %s' % DIR
 
 
 oname = raw_input('Please enter a filename (blank for automatic):')
 if oname == '':
+    # Default filename is the time and date
 	t = datetime.datetime.now()
 	oname = 'sample_'+str(t.year)+'-'+str(t.month)+'-'+str(t.day)+'_'+str(t.hour)+'h'+str(t.minute)+'m'
-oname = DIR+'/DATA/'+oname
 
-print 'Writing to %s.txt' % oname
-N = raw_input('Please enter the number of samples you want to take: ')
-N = int(N)
+# Check if the DATA and FIGS paths exist, and if not create them.
+if not os.path.exists('./DATA/'):
+	print 'DATA directory not found. Creating a folder...'
+	os.makedirs('./DATA/')
+if not os.path.exists('./FIGS/'):
+	print 'FIGS directory not found. Creating a folder...'
+	os.makedirs('./FIGS/')
 
-command = [DIR+'/bin/LogData', str(oname), str(N), '0']
-print command
+oname = './DATA/'+oname
+print 'Writing to %s.txt' % (oname)
+N = ''
+i = 0
+while type(N) != int:
+	N = raw_input('Please enter the number of samples you want to take: ')
+	try:
+		N = int(N)
+	except:
+		i += 1
+		if i > 2:
+			print '...Why are you like this'
+		print '\n'
+
+# Ask the PSEC to read the thing, and store it in DATA with the name we want
+command = ['./bin/LogData', oname, str(N), '0']
 psec = subprocess.Popen(command)
 psec.wait()
 
+# If we can't find the file after the PSEC is done, exit
+if not os.path.isfile(oname+'.txt'):
+	print 'Unable to find %s.txt! Stopping...' % oname
+	exit()
 
-# Samples is a list, and each sample contains
-#  a set of 6 lists which are the channels readings
-
-samples = []
-channels = [[],[],[],[],[],[],[]]
-j = 0
-with open(oname+'.txt', 'r') as f:
-	for line in f:
-		if line[0] == '#':
-			continue
-		else:
-			line = line.split()
-			for i in range(6):
-				channels[i+1].append(line[i])
-			channels[0].append(j)
-			j += 1
-		if j%256 == 0:
-			samples.append(channels)
-			channels = [[],[],[],[],[],[],[]]
-print 'Read out %d samples, in %d lines' % (len(samples), j)
-
-#recover the user inputted name so it can be applied to graphs and whatever
-stamp = oname.split('/')[-1].strip('.txt')
-
-# output graph to a static HTML file
-bkh.output_file(stamp+'.html')
-
-#create plot object
-p = bkh.figure(plot_width=1000, title=stamp, x_axis_label='N', y_axis_label='Voltage, V')
-
-# Read the channels from each sample into long lists for plotting
-channels = [[],[],[],[],[],[]]
-for sample in samples:
-	for i in range(6):
-		for data in sample[i]:
-			channels[i].append(data)
-j = range(len(channels[0]))
-
-# Plot the data
-col = ['red', 'blue', 'orange', 'green', 'purple', 'black']
-i = 1
-#add data to the plot object
-for channel in channels:
-	p.line(j, channel, legend='Channel '+str(i), line_width=1, line_color=col[i-1])
-	i += 1
-
-# set ranges
-p.y_range = Range1d(1.1*vmin, 1.1*vmax)
+# Plot the file we just got
+p = plt.plot_PSEC(oname+'.txt', oname=oname.replace('DATA', 'FIGS'))
 
 bkh.save(p)
+bkh.show(p)

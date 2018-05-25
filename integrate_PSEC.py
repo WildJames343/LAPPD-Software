@@ -14,7 +14,7 @@ import numpy as np
 #  - one or two of the other channels are attached to the LAPPD. If two, 
 #     they are both attached to the same anode. 
 #  - The signal present has been produced by dark noise.
-# The script then calculates the gain of the device, and reporst this as a 
+# The script then calculates the gain of the device, and reports this as a 
 # mean and a histogram.
 
 cwd = os.getcwd()
@@ -57,6 +57,8 @@ for k in keys:
     # i is the channel number
     i = 0
     Vsum = 0.0
+
+    # Integrate the voltages in all samples that rise above the threshold. 
     for channel in sample:
     #     plt.plot(np.arange(0.0, 25.6, 0.1), channel, color='red')
     #     plt.plot(np.arange(0.0, 25.6, 0.1), sample[-2], color='black')

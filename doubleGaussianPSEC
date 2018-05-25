@@ -27,9 +27,11 @@ def chisquare(fobs, fgen):
         k += 1.
     return chi/k
 
+# Model gaussian
 def gaussian(x, height, center, width):
     return height*np.exp(-(x - center)**2/(2*width**2))
 
+# Model double Gaussian
 def two_gaussians(x, h1, c1, w1, h2, c2, w2, offset=0):
     return (gaussian(x, h1, c1, w1) +
         gaussian(x, h2, c2, w2) + offset)
@@ -58,10 +60,14 @@ big_ts, samples = psec.read(fname)
 ts = np.arange(0.0, 25.6, 0.1)
 
 ch = raw_input("What channel on the PSEC? (1-6): ")
+# Convert from human format to computer format
 ch = int(ch)-1
+
 position = float(raw_input("What position on the tile are we at (cm): "))/100.
 
+# Initialise list of velocities
 electronVelocities = []
+# Initialise a dict of time differences. These get tied to the sample number.
 time_differences = {}
 
 if plot:
@@ -81,12 +87,12 @@ if plot:
     all_guesses = []
 
 
+# Chisq error function
+errfunc = lambda p, x, y: (two_gaussians(x, *p) - y)**2
+
 for key, sample in samples.iteritems():
     ## Fit a double gaussian to the data ##
     volts = sample[ch,:]
-
-    # Chisq error function
-    errfunc = lambda p, x, y: (two_gaussians(x, *p) - y)**2
 
     # Guess the locations of the gaussians
     halfmax_volt = 0.5 * np.amin(volts)
@@ -104,8 +110,6 @@ for key, sample in samples.iteritems():
     # Optimise gaussian fit
     optim, success = optimize.leastsq(errfunc, guess[:], args=(ts, volts))
 
-    chisq = chisquare(volts, two_gaussians(ts, *optim))
-    
     # Get the time differences
     time_difference = abs(optim[4]-optim[1])*1e-9 # Convert s to ns
     time_differences[key] = time_difference
@@ -115,6 +119,7 @@ for key, sample in samples.iteritems():
     if velocity < 3e8:
         electronVelocities.append(velocity)
 
+    # chisq = chisquare(volts, two_gaussians(ts, *optim))
     # print("t0: %.2lf\ndt: %2.2g\nVelocity: %2.2g\nchisq: %lf\n---------------" %
         # (25.6*int(key), time_difference, velocity, chisq))
 
@@ -146,6 +151,7 @@ if plot:
             color='purple',
             legend='Gaussians guesses')
 
+    # Plot vertical lines at the boundaries between the samples
     vlines = []
     for i in range(len(samples)):
         vlines.append(Span(location=25.6*i,
@@ -171,8 +177,10 @@ if plot:
 # mpl.hist(time_differences_ps)
 # mpl.show()
 
+# I like numpy
 electronVelocities = np.array(electronVelocities)
 
+# Mean, error, max
 meanVelocity = np.mean(electronVelocities)
 devVelocity  = np.std(electronVelocities)
 maxVelocity  = np.amax(electronVelocities)
@@ -185,4 +193,6 @@ mpl.title(fname.split('/')[-1]+' velocities')
 mpl.xlabel('Velocity')
 mpl.ylabel('Frequency')
 oname = fname.replace('.txt', '')
-mpl.savefig(oname)
+# mpl.savefig(oname)
+mpl.tight_layout()
+mpl.show()

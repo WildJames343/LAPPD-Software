@@ -13,6 +13,7 @@ import plot_PSEC4 as plt
 DIR = '/home/wizenedchimp/Documents/LAPPD-Project/run-psec4-master/'
 DIR = '/home/wizenedchimp/Downloads'
 
+# Recursively searches for a file, in the path given
 def find(name, path):
     result = ''
     for root, dirs, files in os.walk(path):
@@ -21,6 +22,7 @@ def find(name, path):
             break
     return result
 
+# Get the PSEC directory and change into it
 try:
 	DIR
 except:
@@ -34,10 +36,12 @@ if not os.path.exists(DIR):
 	print DIR
 
 os.chdir(DIR)
-# print 'working in directory:\n %s' % DIR
+print 'working in directory:\n %s' % DIR
+
 
 oname = raw_input('Please enter a filename (blank for automatic):')
 if oname == '':
+    # Default filename is the time and date
 	t = datetime.datetime.now()
 	oname = 'sample_'+str(t.year)+'-'+str(t.month)+'-'+str(t.day)+'_'+str(t.hour)+'h'+str(t.minute)+'m'
 
@@ -73,8 +77,8 @@ if not os.path.isfile(oname+'.txt'):
 	print 'Unable to find %s.txt! Stopping...' % oname
 	exit()
 
+# Plot the file we just got
 p = plt.plot_PSEC(oname+'.txt', oname=oname.replace('DATA', 'FIGS'))
-
 
 bkh.save(p)
 bkh.show(p)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Fit a double gaussian to a PSEC logfile
+# Fit a double gaussian to a PSEC logfile, and by knowing the velocity calculate the position.
 
 import matplotlib.pyplot as plt
 import read_PSEC as psec
@@ -59,7 +59,7 @@ ts = np.arange(0.0, 25.6, 0.1)
 ch = raw_input("What channel on the PSEC? (1-6): ")
 ch = int(ch)-1
 # position = float(raw_input("What position on the tile are we at (cm): "))/100
-electronVelocity = 6e7
+electronVelocity = 1.2e8
 
 positions = []
 
@@ -79,6 +79,7 @@ if plot:
     all_gaussians = []
     all_guesses = []
 
+superluminal = 0
 
 for key, sample in samples.iteritems():
     ## Fit a double gaussian to the data ##
@@ -105,17 +106,30 @@ for key, sample in samples.iteritems():
     optim, success = optimize.leastsq(errfunc, guess[:], args=(ts, volts))
 
     chisq = chisquare(volts, two_gaussians(ts, *optim))
-    
+
     # Get the time differences
     time_difference = abs(optim[4]-optim[1])*1e-9 # Convert to ns
 
     # Calculate the position
     position = 0.06 - (.5*time_difference * electronVelocity)
 
-    if position > 0.0 and position < 0.05:
+    if position > 0.0 and position < 0.058:
         positions.append(position*100)
+    elif position < 0.0:
+        superluminal += 1
+    #     print("Time delay = %.4g" % time_difference)
+    #     fig, ax = plt.subplots(figsize=[10,6])
+    #     ax.plot(ts, volts, color='black', label='Raw Data')
+    #     ax.plot(ts, two_gaussians(ts, *optim), color='red', label='Double Gaussian Fit')
+    #     ax.set_xlabel('Time, ns')
+    #     ax.set_ylabel('Voltage, mV')
+    #     ax.legend()
+    #     plt.tight_layout()
+    #     plt.show()
     # positions.append(position*100)
 
+print("I recorded %d superluminal velocities, of %d samples." % 
+    (superluminal, len(positions)))
 print(np.mean(np.array(positions)))
 print(np.std(np.array(positions)))
 

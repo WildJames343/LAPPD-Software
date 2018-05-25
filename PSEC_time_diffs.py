@@ -32,6 +32,7 @@ except:
 f.close()
 
 voltage = float(raw_input("Please enter the applied voltage to the MCP-PMT: "))
+# Use the gain prescription we measured
 gain    = (15400. * voltage) - 34097909.
 print("Voltage: %.2lf\nGain: %.2lf" % (voltage, gain))
 
