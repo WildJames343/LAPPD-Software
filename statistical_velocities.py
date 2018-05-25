@@ -166,9 +166,10 @@ for fname in fnames:
 
 max_velocities = np.array(max_velocities)
 
+
 mean = np.mean(max_velocities)
 std  = np.std(max_velocities)
-standard_error = std/max_velocities.shape[0]
+standard_error = std/np.sqrt(max_velocities.shape[0])
 
 print("Mean Velocity: %.3g" % mean)
 print("Standard Deviation: %.3g" % std)
@@ -178,13 +179,15 @@ plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 
 fig, ax = plt.subplots(figsize=[10,6])
-N, bins, patches = ax.hist(np.log10(max_velocities),
-    bins=20, range=[8.0, 9.0],
+N, bins, patches = ax.hist(max_velocities,
+    bins=30, range=[2.18e8, 2.25e8],
     facecolor='green', edgecolor='black')
-ax.set_xlabel(r'$log_{10}$(Velocity, m/s)')
+ax.set_xlabel(r'Velocity, m/s')
 ax.set_ylabel(r'Frequency')
 plt.tight_layout()
 plt.show()
+
+print("The bin with the most data is the one at ", bins[np.argmax(N)])
 
 with open('max_velocities.txt', 'w') as f:
     for v in max_velocities:
